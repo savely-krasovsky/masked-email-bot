@@ -4,8 +4,8 @@ import (
 	"context"
 	"github.com/L11R/masked-email-bot/internal/domain"
 	"github.com/L11R/masked-email-bot/internal/infra/fastmail"
-	sqlite2 "github.com/L11R/masked-email-bot/internal/infra/sqlite"
-	telegram2 "github.com/L11R/masked-email-bot/internal/infra/telegram"
+	"github.com/L11R/masked-email-bot/internal/infra/sqlite"
+	"github.com/L11R/masked-email-bot/internal/infra/telegram"
 	"github.com/sethvargo/go-envconfig"
 	"go.uber.org/zap"
 	"os"
@@ -14,8 +14,8 @@ import (
 )
 
 type Config struct {
-	TelegramConfig *telegram2.Config
-	DatabaseConfig *sqlite2.Config
+	TelegramConfig *telegram.Config
+	DatabaseConfig *sqlite.Config
 }
 
 func main() {
@@ -29,7 +29,7 @@ func main() {
 		logger.Fatal("Cannot process config from env!", zap.Error(err))
 	}
 
-	db, err := sqlite2.NewAdapter(logger, c.DatabaseConfig)
+	db, err := sqlite.NewAdapter(logger, c.DatabaseConfig)
 	if err != nil {
 		logger.Fatal("Cannot init SQLite database!", zap.Error(err))
 	}
@@ -41,7 +41,7 @@ func main() {
 	service := domain.NewService(db, fmc)
 
 	// Init telegram bot
-	tgClient, err := telegram2.NewAdapter(logger, c.TelegramConfig, service)
+	tgClient, err := telegram.NewAdapter(logger, c.TelegramConfig, service)
 
 	// Setup graceful shutdown
 	shutdown := make(chan error, 1)
