@@ -1,18 +1,31 @@
 package domain
 
+import (
+	"context"
+	"golang.org/x/oauth2"
+)
+
 type Database interface {
-	CreateUser(telegramID int) error
-	UpdateToken(telegramID int, fastmailToken string) error
-	GetUser(telegramID int) (*User, error)
+	CreateUser(telegramID int64) error
+	UpdateToken(telegramID int64, fastmailToken string) error
+	GetUser(telegramID int64) (*User, error)
+
+	CreateOAuth2State(state, codeVerifier string, telegramID int64) error
+	GetOAuth2State(state string) (*OAuth2State, error)
 
 	Close() error
 }
 
 type MaskingEmail interface {
-	CreateMaskedEmail(token, forDomain string) (string, error)
+	CreateMaskedEmail(token *oauth2.Token, forDomain string) (string, error)
+	GetOAuth2Config() *oauth2.Config
 }
 
-type Bot interface {
-	Start() error
-	Stop() error
+type Delivery interface {
+	ListenAndServe() error
+	Shutdown(ctx context.Context) error
+}
+
+type Telegram interface {
+	SendMessage(telegramID int64, text string) error
 }

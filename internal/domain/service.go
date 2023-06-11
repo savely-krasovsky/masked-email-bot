@@ -1,32 +1,122 @@
 package domain
 
+import (
+	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"go.uber.org/zap"
+	"golang.org/x/oauth2"
+	"io"
+)
+
 type Service interface {
-	StartCommand(telegramID int) error
-	TokenCommand(telegramID int, token string) error
-	Link(telegramID int, forDomain string) (string, error)
+	StartCommand(telegramID int64) error
+	TokenCommand(telegramID int64, token string) error
+	AuthCommand(telegramID int64) (string, error)
+	HandleRedirect(ctx context.Context, code, state string) error
+	Link(telegramID int64, forDomain string) (string, error)
 }
 
 type service struct {
-	db    Database
-	email MaskingEmail
+	logger   *zap.Logger
+	db       Database
+	email    MaskingEmail
+	telegram Telegram
 }
 
-func NewService(db Database, email MaskingEmail) Service {
+func NewService(logger *zap.Logger, db Database, email MaskingEmail, telegram Telegram) Service {
 	return &service{
-		db:    db,
-		email: email,
+		logger:   logger,
+		db:       db,
+		email:    email,
+		telegram: telegram,
 	}
 }
 
-func (s *service) StartCommand(telegramID int) error {
+func (s *service) StartCommand(telegramID int64) error {
 	return s.db.CreateUser(telegramID)
 }
 
-func (s *service) TokenCommand(telegramID int, token string) error {
+func (s *service) TokenCommand(telegramID int64, token string) error {
 	return s.db.UpdateToken(telegramID, token)
 }
 
-func (s *service) Link(telegramID int, forDomain string) (string, error) {
+func randomBytesInHex(count int) (string, error) {
+	buf := make([]byte, count)
+	_, err := io.ReadFull(rand.Reader, buf)
+	if err != nil {
+		return "", fmt.Errorf("Could not generate %d random bytes: %v", count, err)
+	}
+
+	return hex.EncodeToString(buf), nil
+}
+
+func (s *service) AuthCommand(telegramID int64) (string, error) {
+	codeVerifier, err := randomBytesInHex(32)
+	if err != nil {
+		s.logger.Error("Error while generating random bytes!", zap.Error(err))
+		return "", ErrRandom
+	}
+
+	hasher := sha256.New()
+	hasher.Write([]byte(codeVerifier))
+	codeChallenge := base64.RawURLEncoding.EncodeToString(hasher.Sum(nil))
+
+	state, err := randomBytesInHex(24)
+	if err != nil {
+		s.logger.Error("Error while generating random bytes!", zap.Error(err))
+		return "", ErrRandom
+	}
+
+	authCodeURL := s.email.GetOAuth2Config().AuthCodeURL(
+		state,
+		oauth2.SetAuthURLParam("code_challenge_method", "S256"),
+		oauth2.SetAuthURLParam("code_challenge", codeChallenge),
+	)
+
+	if err := s.db.CreateOAuth2State(state, codeVerifier, telegramID); err != nil {
+		return "", err
+	}
+
+	return authCodeURL, nil
+}
+
+func (s *service) HandleRedirect(ctx context.Context, code, state string) error {
+	oauth2State, err := s.db.GetOAuth2State(state)
+	if err != nil {
+		return err
+	}
+
+	token, err := s.email.GetOAuth2Config().Exchange(
+		ctx, code, oauth2.SetAuthURLParam("code_verifier", oauth2State.CodeVerifier),
+	)
+	if err != nil {
+		s.logger.Error("Error while exchanging authorization code!", zap.Error(err))
+		return ErrFastmailInternal
+	}
+
+	b, err := json.Marshal(token)
+	if err != nil {
+		s.logger.Error("Error while trying to marshall OAuth2 token!", zap.Error(err))
+		return ErrJSONEncoding
+	}
+
+	if err := s.db.UpdateToken(oauth2State.TelegramID, string(b)); err != nil {
+		return err
+	}
+
+	if err := s.telegram.SendMessage(oauth2State.TelegramID, "Authorization complete!"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *service) Link(telegramID int64, forDomain string) (string, error) {
 	user, err := s.db.GetUser(telegramID)
 	if err != nil {
 		return "", err
@@ -36,5 +126,5 @@ func (s *service) Link(telegramID int, forDomain string) (string, error) {
 		return "", ErrNoToken
 	}
 
-	return s.email.CreateMaskedEmail(*user.FastmailToken, forDomain)
+	return s.email.CreateMaskedEmail(user.FastmailToken, forDomain)
 }

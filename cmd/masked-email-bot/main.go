@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/L11R/masked-email-bot/internal/domain"
 	"github.com/L11R/masked-email-bot/internal/infra/fastmail"
+	"github.com/L11R/masked-email-bot/internal/infra/httpserver"
 	"github.com/L11R/masked-email-bot/internal/infra/sqlite"
 	"github.com/L11R/masked-email-bot/internal/infra/telegram"
 	"github.com/sethvargo/go-envconfig"
@@ -15,6 +16,8 @@ import (
 
 type Config struct {
 	TelegramConfig *telegram.Config
+	HTTPConfig     *httpserver.Config
+	FastmailConfig *fastmail.Config
 	DatabaseConfig *sqlite.Config
 }
 
@@ -29,25 +32,45 @@ func main() {
 		logger.Fatal("Cannot process config from env!", zap.Error(err))
 	}
 
+	// Init SQLite adapter
 	db, err := sqlite.NewAdapter(logger, c.DatabaseConfig)
 	if err != nil {
 		logger.Fatal("Cannot init SQLite database!", zap.Error(err))
 	}
 
-	// Init fastmail client
-	fmc := fastmail.NewAdapter(logger)
+	// Init Fastmail adapter
+	fmc := fastmail.NewAdapter(logger, c.FastmailConfig)
+
+	// Init Telegram adapter
+	t, err := telegram.NewAdapter(logger, c.TelegramConfig)
+	if err != nil {
+		logger.Fatal("Cannot init Telegram adapter!", zap.Error(err))
+	}
 
 	// Init service
-	service := domain.NewService(db, fmc)
-
-	// Init telegram bot
-	tgClient, err := telegram.NewAdapter(logger, c.TelegramConfig, service)
+	service := domain.NewService(logger, db, fmc, t)
 
 	// Setup graceful shutdown
 	shutdown := make(chan error, 1)
 
+	// Init Telegram delivery
+	telegramDelivery, err := telegram.NewDelivery(logger, c.TelegramConfig, service)
+	if err != nil {
+		logger.Fatal("Cannot init Telegram delivery!", zap.Error(err))
+	}
+
 	go func(shutdown chan<- error) {
-		shutdown <- tgClient.Start()
+		shutdown <- telegramDelivery.ListenAndServe()
+	}(shutdown)
+
+	// Init HTTP delivery
+	httpDelivery, err := httpserver.NewDelivery(logger, c.HTTPConfig, service)
+	if err != nil {
+		logger.Fatal("Cannot init HTTP delivery!", zap.Error(err))
+	}
+
+	go func(shutdown chan<- error) {
+		shutdown <- httpDelivery.ListenAndServe()
 	}(shutdown)
 
 	sig := make(chan os.Signal, 1)
@@ -56,7 +79,7 @@ func main() {
 	select {
 	case s := <-sig:
 		logger.Info("Got the signal!", zap.String("signal", s.String()))
-		tgClient.Stop()
+		telegramDelivery.Shutdown(nil)
 		db.Close()
 	case err := <-shutdown:
 		logger.Error("Error running the application!", zap.Error(err))

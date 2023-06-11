@@ -2,9 +2,11 @@ package fastmail
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"github.com/L11R/masked-email-bot/internal/domain"
 	"go.uber.org/zap"
+	"golang.org/x/oauth2"
 	"net/http"
 	"net/netip"
 	"net/url"
@@ -13,23 +15,24 @@ import (
 
 type adapter struct {
 	logger *zap.Logger
+	config *Config
 }
 
-func NewAdapter(logger *zap.Logger) domain.MaskingEmail {
+func NewAdapter(logger *zap.Logger, config *Config) domain.MaskingEmail {
 	return &adapter{
 		logger: logger,
+		config: config,
 	}
 }
 
-func (a *adapter) openSession(token string) (string, error) {
+func (a *adapter) openSession(token *oauth2.Token) (string, error) {
 	req, err := http.NewRequest(http.MethodGet, "https://api.fastmail.com/jmap/session", nil)
 	if err != nil {
 		a.logger.Error("Error while creating a new HTTP request!", zap.Error(err))
 		return "", err
 	}
-	req.Header.Add("Authorization", "Bearer "+token)
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := a.GetOAuth2Config().Client(context.Background(), token).Do(req)
 	if err != nil {
 		a.logger.Error("Error while doing an HTTP request!", zap.Error(err))
 		return "", err
@@ -58,7 +61,7 @@ func (a *adapter) openSession(token string) (string, error) {
 	return "", domain.ErrFastmailPrimaryAccountNotFound
 }
 
-func (a *adapter) createMaskedEmail(token, accountID, forDomain, emailPrefix string) (string, error) {
+func (a *adapter) createMaskedEmail(token *oauth2.Token, accountID, forDomain, emailPrefix string) (string, error) {
 	request := struct {
 		Using       []string `json:"using"`
 		MethodCalls []any    `json:"methodCalls"`
@@ -92,10 +95,9 @@ func (a *adapter) createMaskedEmail(token, accountID, forDomain, emailPrefix str
 		a.logger.Error("Error while creating a new HTTP request!", zap.Error(err))
 		return "", err
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := a.GetOAuth2Config().Client(context.Background(), token).Do(req)
 	if err != nil {
 		a.logger.Error("Error while doing an HTTP request!", zap.Error(err))
 		return "", err
@@ -151,7 +153,7 @@ func (a *adapter) createMaskedEmail(token, accountID, forDomain, emailPrefix str
 	return body.Created.K1.Email, nil
 }
 
-func (a *adapter) CreateMaskedEmail(token, forDomain string) (string, error) {
+func (a *adapter) CreateMaskedEmail(token *oauth2.Token, forDomain string) (string, error) {
 	u, err := url.Parse(forDomain)
 	if err != nil {
 		return "", err
