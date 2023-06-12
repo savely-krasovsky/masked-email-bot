@@ -1,0 +1,10 @@
+TelegramStartCommand = "Приветствуем\\! Чтобы продолжить, пожалуйста, авторизуйтесь в своём аккаунте Fastmail\\."
+TelegramStartCommandAuthButton = "Войти через Fastmail"
+TelegramAuthorizationComplete = "Авторизация завершена\\! Теперь вы можете отправлять боту URL ресурса, для которого вам нужен маскировочный email\\."
+TelegramEmail = '''
+Ваш email: `{{ .Email }}`
+
+Он будет активен только 24 часа, если письмо не поступит\!
+'''
+TelegramUnknownCommand = "О такой команде мне ничего неизвестно!"
+TelegramError = "Произошло нечто ужасное! Попробуйте снова позже..."

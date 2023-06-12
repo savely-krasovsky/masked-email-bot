@@ -13,4 +13,5 @@ var (
 	ErrTelegramInternal               = errors.New("telegram: internal error")
 	ErrHTTPInternal                   = errors.New("http: internal error")
 	ErrSqliteInternal                 = errors.New("sqlite: internal error")
+	ErrSqliteUserAlreadyExists        = errors.New("sqlite: user already exists")
 )

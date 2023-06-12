@@ -2,13 +2,18 @@ package main
 
 import (
 	"context"
+	"embed"
+	"github.com/BurntSushi/toml"
 	"github.com/L11R/masked-email-bot/internal/domain"
 	"github.com/L11R/masked-email-bot/internal/infra/fastmail"
 	"github.com/L11R/masked-email-bot/internal/infra/httpserver"
 	"github.com/L11R/masked-email-bot/internal/infra/sqlite"
 	"github.com/L11R/masked-email-bot/internal/infra/telegram"
+	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"github.com/sethvargo/go-envconfig"
 	"go.uber.org/zap"
+	"golang.org/x/text/language"
+	"io/fs"
 	"os"
 	"os/signal"
 	"syscall"
@@ -20,6 +25,9 @@ type Config struct {
 	FastmailConfig *fastmail.Config
 	DatabaseConfig *sqlite.Config
 }
+
+//go:embed locales/*.toml
+var localeFS embed.FS
 
 func main() {
 	// Init logger
@@ -41,8 +49,23 @@ func main() {
 	// Init Fastmail adapter
 	fmc := fastmail.NewAdapter(logger, c.FastmailConfig)
 
+	// Internalization (i18n)
+	bundle := i18n.NewBundle(language.English)
+	bundle.RegisterUnmarshalFunc("toml", toml.Unmarshal)
+	fs.WalkDir(localeFS, "locales", func(path string, d fs.DirEntry, err error) error {
+		if d.IsDir() {
+			return nil
+		}
+
+		if _, err := bundle.LoadMessageFileFS(localeFS, path); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
 	// Init Telegram adapter
-	t, err := telegram.NewAdapter(logger, c.TelegramConfig)
+	t, err := telegram.NewAdapter(logger, c.TelegramConfig, bundle)
 	if err != nil {
 		logger.Fatal("Cannot init Telegram adapter!", zap.Error(err))
 	}
@@ -54,7 +77,7 @@ func main() {
 	shutdown := make(chan error, 1)
 
 	// Init Telegram delivery
-	telegramDelivery, err := telegram.NewDelivery(logger, c.TelegramConfig, service)
+	telegramDelivery, err := telegram.NewDelivery(logger, c.TelegramConfig, bundle, service)
 	if err != nil {
 		logger.Fatal("Cannot init Telegram delivery!", zap.Error(err))
 	}

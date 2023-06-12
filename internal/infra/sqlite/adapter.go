@@ -50,15 +50,17 @@ func NewAdapter(logger *zap.Logger, config *Config) (domain.Database, error) {
 	}, nil
 }
 
-func (a *adapter) CreateUser(telegramID int64) error {
+func (a *adapter) CreateUser(telegramID int64, languageCode string) error {
 	_, err := a.db.Exec(
-		`INSERT INTO users (telegram_id) VALUES (?)`,
+		`INSERT INTO users (telegram_id, lang) VALUES (?, ?)`,
 		telegramID,
+		languageCode,
 	)
 
 	var sqliteErr sqlite3.Error
 	if errors.As(err, &sqliteErr) && sqliteErr.ExtendedCode == 1555 {
 		a.logger.Info("Duplicate key value violation!", zap.Error(err))
+		return domain.ErrSqliteUserAlreadyExists
 	} else if err != nil {
 		a.logger.Error("Error while creating a user!", zap.Error(err))
 		return domain.ErrSqliteInternal
@@ -81,9 +83,23 @@ func (a *adapter) UpdateToken(telegramID int64, fastmailToken string) error {
 	return nil
 }
 
+func (a *adapter) UpdateLanguageCode(telegramID int64, languageCode string) error {
+	_, err := a.db.Exec(
+		`UPDATE users SET lang = ? WHERE telegram_id = ?`,
+		languageCode,
+		telegramID,
+	)
+	if err != nil {
+		a.logger.Error("Error while updating a language code!", zap.Error(err))
+		return domain.ErrSqliteInternal
+	}
+
+	return nil
+}
+
 func (a *adapter) GetUser(telegramID int64) (*domain.User, error) {
 	row := a.db.QueryRow(
-		`SELECT telegram_id, fastmail_token FROM users WHERE telegram_id = ?`,
+		`SELECT telegram_id, fastmail_token, lang FROM users WHERE telegram_id = ?`,
 		telegramID,
 	)
 
@@ -92,6 +108,7 @@ func (a *adapter) GetUser(telegramID int64) (*domain.User, error) {
 	if err := row.Scan(
 		&user.TelegramID,
 		&tokenStr,
+		&user.LanguageCode,
 	); err != nil {
 		if errors.Is(err, sqlite3.ErrNotFound) {
 			return nil, domain.ErrNoUser

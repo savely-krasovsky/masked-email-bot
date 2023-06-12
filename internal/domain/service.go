@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
@@ -14,9 +15,7 @@ import (
 )
 
 type Service interface {
-	StartCommand(telegramID int64) error
-	TokenCommand(telegramID int64, token string) error
-	AuthCommand(telegramID int64) (string, error)
+	StartCommand(telegramID int64, languageCode string) (string, error)
 	HandleRedirect(ctx context.Context, code, state string) error
 	Link(telegramID int64, forDomain string) (string, error)
 }
@@ -37,14 +36,6 @@ func NewService(logger *zap.Logger, db Database, email MaskingEmail, telegram Te
 	}
 }
 
-func (s *service) StartCommand(telegramID int64) error {
-	return s.db.CreateUser(telegramID)
-}
-
-func (s *service) TokenCommand(telegramID int64, token string) error {
-	return s.db.UpdateToken(telegramID, token)
-}
-
 func randomBytesInHex(count int) (string, error) {
 	buf := make([]byte, count)
 	_, err := io.ReadFull(rand.Reader, buf)
@@ -55,7 +46,17 @@ func randomBytesInHex(count int) (string, error) {
 	return hex.EncodeToString(buf), nil
 }
 
-func (s *service) AuthCommand(telegramID int64) (string, error) {
+func (s *service) StartCommand(telegramID int64, languageCode string) (string, error) {
+	if err := s.db.CreateUser(telegramID, languageCode); err != nil {
+		if !errors.Is(err, ErrSqliteUserAlreadyExists) {
+			return "", err
+		}
+
+		if err := s.db.UpdateLanguageCode(telegramID, languageCode); err != nil {
+			return "", err
+		}
+	}
+
 	codeVerifier, err := randomBytesInHex(32)
 	if err != nil {
 		s.logger.Error("Error while generating random bytes!", zap.Error(err))
@@ -91,6 +92,11 @@ func (s *service) HandleRedirect(ctx context.Context, code, state string) error 
 		return err
 	}
 
+	user, err := s.db.GetUser(oauth2State.TelegramID)
+	if err != nil {
+		return err
+	}
+
 	token, err := s.email.GetOAuth2Config().Exchange(
 		ctx, code, oauth2.SetAuthURLParam("code_verifier", oauth2State.CodeVerifier),
 	)
@@ -105,11 +111,11 @@ func (s *service) HandleRedirect(ctx context.Context, code, state string) error 
 		return ErrJSONEncoding
 	}
 
-	if err := s.db.UpdateToken(oauth2State.TelegramID, string(b)); err != nil {
+	if err := s.db.UpdateToken(user.TelegramID, string(b)); err != nil {
 		return err
 	}
 
-	if err := s.telegram.SendMessage(oauth2State.TelegramID, "Authorization complete!"); err != nil {
+	if err := s.telegram.SendMessage(user.TelegramID, user.LanguageCode, "TelegramAuthorizationComplete"); err != nil {
 		return err
 	}
 

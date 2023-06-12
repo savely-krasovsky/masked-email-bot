@@ -6,8 +6,9 @@ import (
 )
 
 type Database interface {
-	CreateUser(telegramID int64) error
+	CreateUser(telegramID int64, languageCode string) error
 	UpdateToken(telegramID int64, fastmailToken string) error
+	UpdateLanguageCode(telegramID int64, languageCode string) error
 	GetUser(telegramID int64) (*User, error)
 
 	CreateOAuth2State(state, codeVerifier string, telegramID int64) error
@@ -27,5 +28,5 @@ type Delivery interface {
 }
 
 type Telegram interface {
-	SendMessage(telegramID int64, text string) error
+	SendMessage(telegramID int64, languageCode, messageID string) error
 }

@@ -1,0 +1,10 @@
+TelegramStartCommand = "Hello\\! To continue, please authorize with your Fastmail account\\."
+TelegramStartCommandAuthButton = "Sign in with Fastmail"
+TelegramAuthorizationComplete = "Authorization complete\\! Now you can send resource URL for which you need a masked email\\."
+TelegramEmail = '''
+You email: `{{ .Email }}`
+
+It will be available only 24 hours if no email will be received\\!
+'''
+TelegramUnknownCommand = "I don't know anything about this command!"
+TelegramError = "Something bad happened! Please, try again later..."
