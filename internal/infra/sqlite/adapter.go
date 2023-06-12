@@ -104,7 +104,7 @@ func (a *adapter) GetUser(telegramID int64) (*domain.User, error) {
 	)
 
 	var user domain.User
-	var tokenStr string
+	var tokenStr sql.NullString
 	if err := row.Scan(
 		&user.TelegramID,
 		&tokenStr,
@@ -118,9 +118,11 @@ func (a *adapter) GetUser(telegramID int64) (*domain.User, error) {
 		return nil, domain.ErrSqliteInternal
 	}
 
-	if err := json.Unmarshal([]byte(tokenStr), &user.FastmailToken); err != nil {
-		a.logger.Error("Error while decoding a Fastmail token!", zap.Error(err))
-		return nil, domain.ErrSqliteInternal
+	if tokenStr.Valid {
+		if err := json.Unmarshal([]byte(tokenStr.String), &user.FastmailToken); err != nil {
+			a.logger.Error("Error while decoding a Fastmail token!", zap.Error(err))
+			return nil, domain.ErrSqliteInternal
+		}
 	}
 
 	return &user, nil

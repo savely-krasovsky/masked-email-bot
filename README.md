@@ -2,11 +2,14 @@
 
 Currently, works only with Fastmail.com.
 
-To build static binary you can use `podman` image (or `docker`):
+To build static binary you can use this script:
+
 ```bash
 #!/bin/sh
-podman build -t masked-email-bot .
-id=$(podman create masked-email-bot)
-podman cp $id:/usr/local/bin/masked-email-bot .
-podman rm -v $id
+docker build -t masked-email-bot .
+id=$(docker create masked-email-bot)
+docker cp $id:/usr/local/bin/masked-email-bot .
+docker rm -v $id
 ```
+
+It requires `podman` or `docker`.
