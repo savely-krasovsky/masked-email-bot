@@ -31,7 +31,7 @@ var localeFS embed.FS
 
 func main() {
 	// Init logger
-	logger, _ := zap.NewDevelopment()
+	logger, _ := zap.NewProduction()
 	defer logger.Sync()
 
 	// Process config from environment variables

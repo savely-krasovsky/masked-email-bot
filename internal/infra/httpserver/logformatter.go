@@ -25,8 +25,14 @@ type logEntry struct {
 }
 
 func (l *logEntry) Write(status, bytes int, header http.Header, elapsed time.Duration, extra interface{}) {
+	if l.request.URL.Query().Get("code") != "" {
+		q := l.request.URL.Query()
+		q.Set("code", "REDACTED")
+		l.request.URL.RawQuery = q.Encode()
+	}
+
 	l.logger.Info(
-		l.request.Method+" "+l.request.RequestURI+" "+l.request.Proto,
+		l.request.Method+" "+l.request.URL.Path+"?"+l.request.URL.RawQuery+" "+l.request.Proto,
 		zap.Int("status_code", status),
 		zap.Int("bytes", bytes),
 		zap.Object("header", headers(header)),
