@@ -8,6 +8,8 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	sqlite3migrate "github.com/golang-migrate/migrate/v4/database/sqlite3"
 	"github.com/mattn/go-sqlite3"
+	"golang.org/x/oauth2"
+
 	// file driver for the golang-migrate
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	// sqlite driver
@@ -168,4 +170,45 @@ func (a *adapter) GetOAuth2State(state string) (*domain.OAuth2State, error) {
 
 func (a *adapter) Close() error {
 	return a.db.Close()
+}
+
+func (a *adapter) NewTokenSource(baseTokenSource oauth2.TokenSource, telegramID int64) oauth2.TokenSource {
+	return &tokenSource{
+		database:        a,
+		baseTokenSource: baseTokenSource,
+		telegramID:      telegramID,
+	}
+}
+
+type tokenSource struct {
+	database        domain.Database
+	baseTokenSource oauth2.TokenSource
+	telegramID      int64
+}
+
+func (ts *tokenSource) Token() (*oauth2.Token, error) {
+	user, err := ts.database.GetUser(ts.telegramID)
+	if err != nil {
+		return nil, err
+	}
+
+	if user.FastmailToken.Valid() {
+		return user.FastmailToken, nil
+	}
+
+	token, err := ts.baseTokenSource.Token()
+	if err != nil {
+		return nil, err
+	}
+
+	b, err := json.Marshal(token)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := ts.database.UpdateToken(ts.telegramID, string(b)); err != nil {
+		return nil, err
+	}
+
+	return token, nil
 }

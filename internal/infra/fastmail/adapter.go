@@ -25,14 +25,14 @@ func NewAdapter(logger *zap.Logger, config *Config) domain.MaskingEmail {
 	}
 }
 
-func (a *adapter) openSession(token *oauth2.Token) (string, error) {
+func (a *adapter) openSession(ctx context.Context, tokenSrc oauth2.TokenSource) (string, error) {
 	req, err := http.NewRequest(http.MethodGet, "https://api.fastmail.com/jmap/session", nil)
 	if err != nil {
 		a.logger.Error("Error while creating a new HTTP request!", zap.Error(err))
 		return "", err
 	}
 
-	resp, err := a.GetOAuth2Config().Client(context.Background(), token).Do(req)
+	resp, err := oauth2.NewClient(ctx, tokenSrc).Do(req)
 	if err != nil {
 		a.logger.Error("Error while doing an HTTP request!", zap.Error(err))
 		return "", err
@@ -61,7 +61,7 @@ func (a *adapter) openSession(token *oauth2.Token) (string, error) {
 	return "", domain.ErrFastmailPrimaryAccountNotFound
 }
 
-func (a *adapter) createMaskedEmail(token *oauth2.Token, accountID, forDomain, emailPrefix string) (string, error) {
+func (a *adapter) createMaskedEmail(ctx context.Context, tokenSrc oauth2.TokenSource, accountID, forDomain, emailPrefix string) (string, error) {
 	request := struct {
 		Using       []string `json:"using"`
 		MethodCalls []any    `json:"methodCalls"`
@@ -97,7 +97,7 @@ func (a *adapter) createMaskedEmail(token *oauth2.Token, accountID, forDomain, e
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := a.GetOAuth2Config().Client(context.Background(), token).Do(req)
+	resp, err := oauth2.NewClient(ctx, tokenSrc).Do(req)
 	if err != nil {
 		a.logger.Error("Error while doing an HTTP request!", zap.Error(err))
 		return "", err
@@ -153,7 +153,7 @@ func (a *adapter) createMaskedEmail(token *oauth2.Token, accountID, forDomain, e
 	return body.Created.K1.Email, nil
 }
 
-func (a *adapter) CreateMaskedEmail(token *oauth2.Token, forDomain string) (string, error) {
+func (a *adapter) CreateMaskedEmail(ctx context.Context, tokenSrc oauth2.TokenSource, forDomain string) (string, error) {
 	u, err := url.Parse(forDomain)
 	if err != nil {
 		return "", err
@@ -184,10 +184,10 @@ func (a *adapter) CreateMaskedEmail(token *oauth2.Token, forDomain string) (stri
 		emailPrefix = "dev"
 	}
 
-	accountId, err := a.openSession(token)
+	accountId, err := a.openSession(ctx, tokenSrc)
 	if err != nil {
 		return "", err
 	}
 
-	return a.createMaskedEmail(token, accountId, u.String(), emailPrefix)
+	return a.createMaskedEmail(ctx, tokenSrc, accountId, u.String(), emailPrefix)
 }

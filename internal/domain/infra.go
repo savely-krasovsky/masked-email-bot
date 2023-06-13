@@ -15,10 +15,11 @@ type Database interface {
 	GetOAuth2State(state string) (*OAuth2State, error)
 
 	Close() error
+	NewTokenSource(baseTokenSource oauth2.TokenSource, telegramID int64) oauth2.TokenSource
 }
 
 type MaskingEmail interface {
-	CreateMaskedEmail(token *oauth2.Token, forDomain string) (string, error)
+	CreateMaskedEmail(ctx context.Context, tokenSrc oauth2.TokenSource, forDomain string) (string, error)
 	GetOAuth2Config() *oauth2.Config
 }
 

@@ -132,5 +132,11 @@ func (s *service) Link(telegramID int64, forDomain string) (string, error) {
 		return "", ErrNoToken
 	}
 
-	return s.email.CreateMaskedEmail(user.FastmailToken, forDomain)
+	ctx := context.Background()
+	tokenSrc := s.db.NewTokenSource(
+		s.email.GetOAuth2Config().TokenSource(ctx, user.FastmailToken),
+		user.TelegramID,
+	)
+
+	return s.email.CreateMaskedEmail(ctx, tokenSrc, forDomain)
 }
