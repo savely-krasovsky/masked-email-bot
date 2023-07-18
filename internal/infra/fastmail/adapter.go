@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/netip"
 	"net/url"
+	"regexp"
 	"strings"
 )
 
@@ -183,6 +184,9 @@ func (a *adapter) CreateMaskedEmail(ctx context.Context, tokenSrc oauth2.TokenSo
 	case "github":
 		emailPrefix = "dev"
 	}
+
+	// remove all special characters
+	emailPrefix = regexp.MustCompile(`[^a-zA-Z0-9]+`).ReplaceAllString(emailPrefix, "")
 
 	accountId, err := a.openSession(ctx, tokenSrc)
 	if err != nil {
