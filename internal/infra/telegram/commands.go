@@ -4,6 +4,8 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"go.uber.org/zap"
+	"regexp"
+	"strings"
 )
 
 func (d *delivery) startCommand(localizer *i18n.Localizer, update tgbotapi.Update) error {
@@ -47,8 +49,8 @@ func (d *delivery) anyOtherCommand(localizer *i18n.Localizer, update tgbotapi.Up
 	return nil
 }
 
-func (d *delivery) link(localizer *i18n.Localizer, update tgbotapi.Update) error {
-	maskedEmail, err := d.service.Link(update.Message.From.ID, update.Message.Text)
+func (d *delivery) generateMaskedEmail(localizer *i18n.Localizer, update tgbotapi.Update) error {
+	maskedEmail, err := d.service.GenerateMaskedEmail(update.Message.From.ID, update.Message.Text)
 	if err != nil {
 		msg := tgbotapi.NewMessage(update.Message.From.ID, localizer.MustLocalize(&i18n.LocalizeConfig{
 			MessageID: "TelegramError",
@@ -58,6 +60,7 @@ func (d *delivery) link(localizer *i18n.Localizer, update tgbotapi.Update) error
 		}
 		return err
 	}
+	maskedEmail.ID = "id:" + maskedEmail.ID
 
 	msg := tgbotapi.NewMessage(update.Message.From.ID, localizer.MustLocalize(&i18n.LocalizeConfig{
 		MessageID: "TelegramEmail",
@@ -66,12 +69,10 @@ func (d *delivery) link(localizer *i18n.Localizer, update tgbotapi.Update) error
 		},
 	}))
 	msg.ParseMode = "MarkdownV2"
-	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup([]tgbotapi.InlineKeyboardButton{
-		{
-			Text:         localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "TelegramEmailDoNotDeleteButton"}),
-			CallbackData: &maskedEmail.ID,
-		},
-	})
+	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup([]tgbotapi.InlineKeyboardButton{{
+		Text:         localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "TelegramEmailDoNotDeleteButton"}),
+		CallbackData: &maskedEmail.ID,
+	}})
 	if _, err := d.bot.Send(msg); err != nil {
 		d.logger.Error("Error while sending a message!", zap.Error(err))
 	}
@@ -98,16 +99,7 @@ func (d *delivery) enableMaskedEmail(localizer *i18n.Localizer, update tgbotapi.
 		d.logger.Error("Error while answering to the callback query!", zap.Error(err))
 	}
 
-	// Remove inline reply markup
-	/*if _, err := d.bot.Send(&tgbotapi.EditMessageReplyMarkupConfig{
-		BaseEdit: tgbotapi.BaseEdit{
-			ChatID:    update.CallbackQuery.Message.Chat.ID,
-			MessageID: update.CallbackQuery.Message.MessageID,
-		},
-	}); err != nil {
-		d.logger.Error("Error while removing inline keyboard!", zap.Error(err))
-	}*/
-
+	// Remove inline keyboard and remove disclaimer from message
 	runes := []rune(update.CallbackQuery.Message.Text)
 	start := update.CallbackQuery.Message.Entities[0].Offset
 	end := update.CallbackQuery.Message.Entities[0].Offset + update.CallbackQuery.Message.Entities[0].Length
@@ -125,6 +117,78 @@ func (d *delivery) enableMaskedEmail(localizer *i18n.Localizer, update tgbotapi.
 	)
 	msg.ParseMode = "MarkdownV2"
 	if _, err := d.bot.Send(msg); err != nil {
+		d.logger.Error("Error while editing a message!", zap.Error(err))
+	}
+
+	return nil
+}
+
+func (d *delivery) answerInlineQueryWithEmail(localizer *i18n.Localizer, update tgbotapi.Update) error {
+	re := regexp.MustCompile(`[a-z0-9_]+`)
+	if re.FindString(update.InlineQuery.Query) != update.InlineQuery.Query || update.InlineQuery.Query == "" {
+		inlineConf := tgbotapi.InlineConfig{
+			InlineQueryID: update.InlineQuery.ID,
+			IsPersonal:    true,
+			CacheTime:     0,
+			Results:       []interface{}{},
+		}
+		if _, err := d.bot.Request(inlineConf); err != nil {
+			d.logger.Error("Error while answering inline query!", zap.Error(err))
+		}
+
+		return nil
+	}
+
+	example := update.InlineQuery.Query + ".xxxxx@example.com"
+	result := tgbotapi.NewInlineQueryResultArticleMarkdownV2(update.InlineQuery.ID, example, "`"+example+"`")
+	update.InlineQuery.Query = "prefix:" + update.InlineQuery.Query
+	markup := tgbotapi.NewInlineKeyboardMarkup([]tgbotapi.InlineKeyboardButton{{
+		Text:         localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: "TelegramInlineQueryGenerate"}),
+		CallbackData: &update.InlineQuery.Query,
+	}})
+	result.ReplyMarkup = &markup
+
+	inlineConf := tgbotapi.InlineConfig{
+		InlineQueryID: update.InlineQuery.ID,
+		IsPersonal:    true,
+		CacheTime:     0,
+		Results:       []interface{}{result},
+	}
+	if _, err := d.bot.Request(inlineConf); err != nil {
+		d.logger.Error("Error while answering inline query!", zap.Error(err))
+	}
+
+	return nil
+}
+
+func (d *delivery) generateMaskedEmailWithInlineButton(localizer *i18n.Localizer, update tgbotapi.Update) error {
+	maskedEmail, err := d.service.Prefix(update.CallbackQuery.From.ID, strings.Split(update.CallbackData(), ":")[1])
+	if err != nil {
+		callback := tgbotapi.NewCallback(update.CallbackQuery.ID, localizer.MustLocalize(&i18n.LocalizeConfig{
+			MessageID: "TelegramError",
+		}))
+		callback.ShowAlert = true
+		if _, err := d.bot.Request(callback); err != nil {
+			d.logger.Error("Error while answering to the callback query!", zap.Error(err))
+		}
+		return err
+	}
+
+	callback := tgbotapi.NewCallback(update.CallbackQuery.ID, localizer.MustLocalize(&i18n.LocalizeConfig{
+		MessageID: "TelegramInlineQueryGenerated",
+	}))
+	if _, err := d.bot.Request(callback); err != nil {
+		d.logger.Error("Error while answering to the callback query!", zap.Error(err))
+	}
+
+	msg := &tgbotapi.EditMessageTextConfig{
+		BaseEdit: tgbotapi.BaseEdit{
+			InlineMessageID: update.CallbackQuery.InlineMessageID,
+		},
+		Text: "`" + maskedEmail.Email + "`",
+	}
+	msg.ParseMode = "MarkdownV2"
+	if _, err := d.bot.Request(msg); err != nil {
 		d.logger.Error("Error while editing a message!", zap.Error(err))
 	}
 

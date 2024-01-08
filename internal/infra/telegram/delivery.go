@@ -6,6 +6,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"go.uber.org/zap"
+	"strings"
 )
 
 type delivery struct {
@@ -56,14 +57,26 @@ func (d *delivery) ListenAndServe() error {
 					continue
 				}
 			}
-			if err := d.link(localizer, update); err != nil {
+			if err := d.generateMaskedEmail(localizer, update); err != nil {
 				d.logger.Error("Error while handling a link!", zap.Error(err))
 			}
 		case update.CallbackQuery != nil:
 			localizer := i18n.NewLocalizer(d.bundle, update.CallbackQuery.From.LanguageCode)
-			d.logger.Info(update.CallbackData())
-			if err := d.enableMaskedEmail(localizer, update); err != nil {
-				d.logger.Error("Error while enabling a masked email!", zap.Error(err))
+			data := strings.Split(update.CallbackData(), ":")
+			switch data[0] {
+			case "id":
+				if err := d.enableMaskedEmail(localizer, update); err != nil {
+					d.logger.Error("Error while enabling a masked email!", zap.Error(err))
+				}
+			case "prefix":
+				if err := d.generateMaskedEmailWithInlineButton(localizer, update); err != nil {
+					d.logger.Error("Error while generating a masked email!", zap.Error(err))
+				}
+			}
+		case update.InlineQuery != nil:
+			localizer := i18n.NewLocalizer(d.bundle, update.InlineQuery.From.LanguageCode)
+			if err := d.answerInlineQueryWithEmail(localizer, update); err != nil {
+				d.logger.Error("Error while trying to answer inline query!", zap.Error(err))
 			}
 		}
 	}

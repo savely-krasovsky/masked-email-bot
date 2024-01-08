@@ -12,12 +12,15 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 	"io"
+	"net/url"
+	"regexp"
 )
 
 type Service interface {
 	StartCommand(telegramID int64, languageCode string) (string, error)
 	HandleRedirect(ctx context.Context, code, state string) error
-	Link(telegramID int64, forDomain string) (*MaskedEmail, error)
+	GenerateMaskedEmail(telegramID int64, messageText string) (*MaskedEmail, error)
+	Prefix(telegramID int64, prefix string) (*MaskedEmail, error)
 	EnableMaskedEmail(telegramID int64, id string) error
 }
 
@@ -123,7 +126,7 @@ func (s *service) HandleRedirect(ctx context.Context, code, state string) error 
 	return nil
 }
 
-func (s *service) Link(telegramID int64, forDomain string) (*MaskedEmail, error) {
+func (s *service) GenerateMaskedEmail(telegramID int64, messageText string) (*MaskedEmail, error) {
 	user, err := s.db.GetUser(telegramID)
 	if err != nil {
 		return nil, err
@@ -139,7 +142,32 @@ func (s *service) Link(telegramID int64, forDomain string) (*MaskedEmail, error)
 		user.TelegramID,
 	)
 
-	maskedEmail, err := s.email.CreateMaskedEmail(ctx, tokenSrc, forDomain)
+	u, err := url.Parse(messageText)
+	if err != nil || regexp.MustCompile(`[a-z0-9_]+`).FindString(u.String()) == messageText {
+		s.logger.Error("Error while parsing url for domain!", zap.Error(err))
+		return s.email.CreateMaskedEmailWithPrefix(ctx, tokenSrc, messageText)
+	}
+
+	return s.email.CreateMaskedEmailFromURL(ctx, tokenSrc, u)
+}
+
+func (s *service) Prefix(telegramID int64, prefix string) (*MaskedEmail, error) {
+	user, err := s.db.GetUser(telegramID)
+	if err != nil {
+		return nil, err
+	}
+
+	if user.FastmailToken == nil {
+		return nil, ErrNoToken
+	}
+
+	ctx := context.Background()
+	tokenSrc := s.db.NewTokenSource(
+		s.email.GetOAuth2Config().TokenSource(ctx, user.FastmailToken),
+		user.TelegramID,
+	)
+
+	maskedEmail, err := s.email.CreateMaskedEmailWithPrefix(ctx, tokenSrc, prefix)
 	if err != nil {
 		return nil, err
 	}

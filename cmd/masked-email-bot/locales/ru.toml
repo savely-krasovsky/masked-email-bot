@@ -9,5 +9,7 @@ TelegramEmail = '''
 TelegramEmailWithoutDisclaimer = "Ваш email: `{{ .Email }}`"
 TelegramEmailDoNotDeleteButton = "Не удалять"
 TelegramEmailActivated = "Email активирован и не будет удален!"
+TelegramInlineQueryGenerate = "Сгенерировать"
+TelegramInlineQueryGenerated = "Email сгенерирован!"
 TelegramUnknownCommand = "О такой команде мне ничего неизвестно!"
 TelegramError = "Произошло нечто ужасное! Попробуйте снова позже..."

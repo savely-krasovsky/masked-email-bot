@@ -123,14 +123,12 @@ func (a *adapter) createMaskedEmail(ctx context.Context, tokenSrc oauth2.TokenSo
 	return created, nil
 }
 
-func (a *adapter) CreateMaskedEmail(ctx context.Context, tokenSrc oauth2.TokenSource, forDomain string) (*domain.MaskedEmail, error) {
-	u, err := url.Parse(forDomain)
-	if err != nil {
-		a.logger.Error("Error while parsing url for domain!", zap.Error(err))
-		return nil, domain.ErrFastmailInternal
-	}
+func (a *adapter) CreateMaskedEmailFromURL(ctx context.Context, tokenSrc oauth2.TokenSource, u *url.URL) (*domain.MaskedEmail, error) {
+	u.Opaque = ""
+	u.User = nil
 	u.Path = ""
 	u.RawQuery = ""
+	u.Fragment = ""
 
 	emailPrefix := ""
 
@@ -155,8 +153,8 @@ func (a *adapter) CreateMaskedEmail(ctx context.Context, tokenSrc oauth2.TokenSo
 		emailPrefix = "dev"
 	}
 
-	// remove all special characters
-	emailPrefix = regexp.MustCompile(`[^a-zA-Z0-9]+`).ReplaceAllString(emailPrefix, "")
+	// remove all special characters except underscore
+	emailPrefix = regexp.MustCompile(`[^a-zA-Z0-9_]+`).ReplaceAllString(emailPrefix, "")
 
 	accountId, err := a.openSession(ctx, tokenSrc)
 	if err != nil {
@@ -164,6 +162,23 @@ func (a *adapter) CreateMaskedEmail(ctx context.Context, tokenSrc oauth2.TokenSo
 	}
 
 	maskedEmail, err := a.createMaskedEmail(ctx, tokenSrc, accountId, u.String(), emailPrefix)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.MaskedEmail{
+		ID:    maskedEmail.ID,
+		Email: maskedEmail.Email,
+	}, nil
+}
+
+func (a *adapter) CreateMaskedEmailWithPrefix(ctx context.Context, tokenSrc oauth2.TokenSource, prefix string) (*domain.MaskedEmail, error) {
+	accountId, err := a.openSession(ctx, tokenSrc)
+	if err != nil {
+		return nil, err
+	}
+
+	maskedEmail, err := a.createMaskedEmail(ctx, tokenSrc, accountId, "", prefix)
 	if err != nil {
 		return nil, err
 	}

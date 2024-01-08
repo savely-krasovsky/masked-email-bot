@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"golang.org/x/oauth2"
+	"net/url"
 )
 
 type Database interface {
@@ -19,7 +20,8 @@ type Database interface {
 }
 
 type MaskingEmail interface {
-	CreateMaskedEmail(ctx context.Context, tokenSrc oauth2.TokenSource, forDomain string) (*MaskedEmail, error)
+	CreateMaskedEmailFromURL(ctx context.Context, tokenSrc oauth2.TokenSource, url *url.URL) (*MaskedEmail, error)
+	CreateMaskedEmailWithPrefix(ctx context.Context, tokenSrc oauth2.TokenSource, prefix string) (*MaskedEmail, error)
 	EnableMaskedEmail(ctx context.Context, tokenSrc oauth2.TokenSource, id string) error
 	GetOAuth2Config() *oauth2.Config
 }
