@@ -19,7 +19,8 @@ type Database interface {
 }
 
 type MaskingEmail interface {
-	CreateMaskedEmail(ctx context.Context, tokenSrc oauth2.TokenSource, forDomain string) (string, error)
+	CreateMaskedEmail(ctx context.Context, tokenSrc oauth2.TokenSource, forDomain string) (*MaskedEmail, error)
+	EnableMaskedEmail(ctx context.Context, tokenSrc oauth2.TokenSource, id string) error
 	GetOAuth2Config() *oauth2.Config
 }
 

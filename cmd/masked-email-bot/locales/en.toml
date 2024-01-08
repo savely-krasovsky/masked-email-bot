@@ -4,7 +4,10 @@ TelegramAuthorizationComplete = "Authorization complete\\! Now you can send reso
 TelegramEmail = '''
 You email: `{{ .Email }}`
 
-It will be available only 24 hours if no email will be received\\!
+It will be available only 24 hours if no email will be received\!
 '''
+TelegramEmailWithoutDisclaimer = "You email: `{{ .Email }}`"
+TelegramEmailDoNotDeleteButton = "Do Not Delete"
+TelegramEmailActivated = "Email has been activated and will not be deleted!"
 TelegramUnknownCommand = "I don't know anything about this command!"
 TelegramError = "Something bad happened! Please, try again later..."

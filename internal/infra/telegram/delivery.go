@@ -39,29 +39,32 @@ func (d *delivery) ListenAndServe() error {
 	updates := d.bot.GetUpdatesChan(updateConfig)
 
 	for update := range updates {
-		if update.Message == nil {
-			continue
-		}
-
-		localizer := i18n.NewLocalizer(d.bundle, update.Message.From.LanguageCode)
-
-		if update.Message.IsCommand() {
-			switch update.Message.Command() {
-			case "start":
-				if err := d.startCommand(localizer, update); err != nil {
-					d.logger.Error("Error while handling command!", zap.Error(err))
+		switch {
+		case update.Message != nil:
+			localizer := i18n.NewLocalizer(d.bundle, update.Message.From.LanguageCode)
+			if update.Message.IsCommand() {
+				switch update.Message.Command() {
+				case "start":
+					if err := d.startCommand(localizer, update); err != nil {
+						d.logger.Error("Error while handling command!", zap.Error(err))
+					}
+					continue
+				default:
+					if err := d.anyOtherCommand(localizer, update); err != nil {
+						d.logger.Error("Error while handling command!", zap.Error(err))
+					}
+					continue
 				}
-				continue
-			default:
-				if err := d.anyOtherCommand(localizer, update); err != nil {
-					d.logger.Error("Error while handling command!", zap.Error(err))
-				}
-				continue
 			}
-		}
-
-		if err := d.link(localizer, update); err != nil {
-			d.logger.Error("Error while handling a link!", zap.Error(err))
+			if err := d.link(localizer, update); err != nil {
+				d.logger.Error("Error while handling a link!", zap.Error(err))
+			}
+		case update.CallbackQuery != nil:
+			localizer := i18n.NewLocalizer(d.bundle, update.CallbackQuery.From.LanguageCode)
+			d.logger.Info(update.CallbackData())
+			if err := d.enableMaskedEmail(localizer, update); err != nil {
+				d.logger.Error("Error while enabling a masked email!", zap.Error(err))
+			}
 		}
 	}
 

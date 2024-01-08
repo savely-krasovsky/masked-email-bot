@@ -13,3 +13,8 @@ type OAuth2State struct {
 	CodeVerifier string
 	TelegramID   int64
 }
+
+type MaskedEmail struct {
+	ID    string
+	Email string
+}

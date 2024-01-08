@@ -4,7 +4,10 @@ TelegramAuthorizationComplete = "Авторизация завершена\\! Т
 TelegramEmail = '''
 Ваш email: `{{ .Email }}`
 
-Он будет активен только 24 часа, если письмо не поступит\\!
+Он будет активен только 24 часа, если письмо не поступит\!
 '''
+TelegramEmailWithoutDisclaimer = "Ваш email: `{{ .Email }}`"
+TelegramEmailDoNotDeleteButton = "Не удалять"
+TelegramEmailActivated = "Email активирован и не будет удален!"
 TelegramUnknownCommand = "О такой команде мне ничего неизвестно!"
 TelegramError = "Произошло нечто ужасное! Попробуйте снова позже..."

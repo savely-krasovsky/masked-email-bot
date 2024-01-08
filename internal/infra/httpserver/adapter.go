@@ -44,6 +44,7 @@ func (d *delivery) ListenAndServe() error {
 	d.logger.Info("Listening and serving HTTP requests.", zap.String("address", d.config.Address))
 
 	if err := d.server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		//if err := d.server.ListenAndServeTLS("cert.pem", "key.pem"); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		d.logger.Error("Error listening and serving HTTP requests!", zap.Error(err))
 		return domain.ErrHTTPInternal
 	}

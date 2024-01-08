@@ -30,13 +30,13 @@ func (a *adapter) openSession(ctx context.Context, tokenSrc oauth2.TokenSource) 
 	req, err := http.NewRequest(http.MethodGet, "https://api.fastmail.com/jmap/session", nil)
 	if err != nil {
 		a.logger.Error("Error while creating a new HTTP request!", zap.Error(err))
-		return "", err
+		return "", domain.ErrFastmailInternal
 	}
 
 	resp, err := oauth2.NewClient(ctx, tokenSrc).Do(req)
 	if err != nil {
 		a.logger.Error("Error while doing an HTTP request!", zap.Error(err))
-		return "", err
+		return "", domain.ErrFastmailInternal
 	}
 	defer resp.Body.Close()
 
@@ -50,7 +50,7 @@ func (a *adapter) openSession(ctx context.Context, tokenSrc oauth2.TokenSource) 
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&jsonResp); err != nil {
 		a.logger.Error("Error while trying to decode JSON response!", zap.Error(err))
-		return "", err
+		return "", domain.ErrFastmailInternal
 	}
 
 	for k, v := range jsonResp.PrimaryAccounts {
@@ -62,25 +62,22 @@ func (a *adapter) openSession(ctx context.Context, tokenSrc oauth2.TokenSource) 
 	return "", domain.ErrFastmailPrimaryAccountNotFound
 }
 
-func (a *adapter) createMaskedEmail(ctx context.Context, tokenSrc oauth2.TokenSource, accountID, forDomain, emailPrefix string) (string, error) {
-	request := struct {
-		Using       []string `json:"using"`
-		MethodCalls []any    `json:"methodCalls"`
-	}{
+func (a *adapter) createMaskedEmail(ctx context.Context, tokenSrc oauth2.TokenSource, accountID, forDomain, emailPrefix string) (*MaskedEmail, error) {
+	request := &Request[*MaskedEmailSetRequest]{
 		Using: []string{"https://www.fastmail.com/dev/maskedemail"},
-		MethodCalls: []any{
-			[]any{
-				"MaskedEmail/set",
-				map[string]any{
-					"accountId": accountID,
-					"create": map[string]any{
-						"k1": map[string]string{
-							"forDomain":   forDomain,
-							"emailPrefix": emailPrefix,
+		MethodCalls: []*Invocation[*MaskedEmailSetRequest]{
+			{
+				Name: "MaskedEmail/set",
+				Body: &MaskedEmailSetRequest{
+					AccountID: accountID,
+					Create: map[string]*MaskedEmail{
+						"k1": {
+							ForDomain:   forDomain,
+							EmailPrefix: emailPrefix,
 						},
 					},
 				},
-				"0",
+				ID: "0",
 			},
 		},
 	}
@@ -88,76 +85,49 @@ func (a *adapter) createMaskedEmail(ctx context.Context, tokenSrc oauth2.TokenSo
 	buf := bytes.NewBuffer(nil)
 	if err := json.NewEncoder(buf).Encode(request); err != nil {
 		a.logger.Error("Error while trying to encode JSON request!", zap.Error(err))
-		return "", err
+		return nil, domain.ErrFastmailInternal
 	}
 
 	req, err := http.NewRequest(http.MethodPost, "https://api.fastmail.com/jmap/api/", buf)
 	if err != nil {
 		a.logger.Error("Error while creating a new HTTP request!", zap.Error(err))
-		return "", err
+		return nil, domain.ErrFastmailInternal
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := oauth2.NewClient(ctx, tokenSrc).Do(req)
 	if err != nil {
 		a.logger.Error("Error while doing an HTTP request!", zap.Error(err))
-		return "", err
+		return nil, domain.ErrFastmailInternal
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		a.logger.Error("Wrong status code!")
-		return "", domain.ErrFastmailInternal
+		return nil, domain.ErrFastmailInternal
 	}
 
 	var jsonResp struct {
-		MethodResponses [][]json.RawMessage `json:"methodResponses"`
+		MethodResponses []*Invocation[*MaskedEmailSetResponse] `json:"methodResponses"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&jsonResp); err != nil {
 		a.logger.Error("Error while trying to decode JSON response!", zap.Error(err))
-		return "", err
+		return nil, domain.ErrFastmailInternal
 	}
 
-	var (
-		methodName string
-		body       struct {
-			Created struct {
-				K1 struct {
-					Email string `json:"email"`
-				} `json:"k1"`
-			} `json:"created"`
-		}
-		status string
-	)
-	if len(jsonResp.MethodResponses) > 0 && len(jsonResp.MethodResponses[0]) > 0 {
-		for index, raw := range jsonResp.MethodResponses[0] {
-			switch index {
-			case 0:
-				if err := json.Unmarshal(raw, &methodName); err != nil {
-					a.logger.Error("Error while trying to parse JSON response!", zap.Error(err))
-					return "", err
-				}
-			case 1:
-				if err := json.Unmarshal(raw, &body); err != nil {
-					a.logger.Error("Error while trying to parse JSON response!", zap.Error(err))
-					return "", err
-				}
-			case 2:
-				if err := json.Unmarshal(raw, &status); err != nil {
-					a.logger.Error("Error while trying to parse JSON response!", zap.Error(err))
-					return "", err
-				}
-			}
-		}
+	created, ok := jsonResp.MethodResponses[0].Body.Created["k1"]
+	if !ok {
+		return nil, domain.ErrFastmailInternal
 	}
 
-	return body.Created.K1.Email, nil
+	return created, nil
 }
 
-func (a *adapter) CreateMaskedEmail(ctx context.Context, tokenSrc oauth2.TokenSource, forDomain string) (string, error) {
+func (a *adapter) CreateMaskedEmail(ctx context.Context, tokenSrc oauth2.TokenSource, forDomain string) (*domain.MaskedEmail, error) {
 	u, err := url.Parse(forDomain)
 	if err != nil {
-		return "", err
+		a.logger.Error("Error while parsing url for domain!", zap.Error(err))
+		return nil, domain.ErrFastmailInternal
 	}
 	u.Path = ""
 	u.RawQuery = ""
@@ -190,8 +160,84 @@ func (a *adapter) CreateMaskedEmail(ctx context.Context, tokenSrc oauth2.TokenSo
 
 	accountId, err := a.openSession(ctx, tokenSrc)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return a.createMaskedEmail(ctx, tokenSrc, accountId, u.String(), emailPrefix)
+	maskedEmail, err := a.createMaskedEmail(ctx, tokenSrc, accountId, u.String(), emailPrefix)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.MaskedEmail{
+		ID:    maskedEmail.ID,
+		Email: maskedEmail.Email,
+	}, nil
+}
+
+func (a *adapter) enableMaskedEmail(ctx context.Context, tokenSrc oauth2.TokenSource, accountID, id string) error {
+	request := &Request[*MaskedEmailSetRequest]{
+		Using: []string{"https://www.fastmail.com/dev/maskedemail"},
+		MethodCalls: []*Invocation[*MaskedEmailSetRequest]{
+			{
+				Name: "MaskedEmail/set",
+				Body: &MaskedEmailSetRequest{
+					AccountID: accountID,
+					Update: map[string]*MaskedEmail{
+						id: {
+							State: MaskedEmailStateEnabled,
+						},
+					},
+				},
+				ID: "0",
+			},
+		},
+	}
+
+	buf := bytes.NewBuffer(nil)
+	if err := json.NewEncoder(buf).Encode(request); err != nil {
+		a.logger.Error("Error while trying to encode JSON request!", zap.Error(err))
+		return domain.ErrFastmailInternal
+	}
+
+	req, err := http.NewRequest(http.MethodPost, "https://api.fastmail.com/jmap/api/", buf)
+	if err != nil {
+		a.logger.Error("Error while creating a new HTTP request!", zap.Error(err))
+		return domain.ErrFastmailInternal
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := oauth2.NewClient(ctx, tokenSrc).Do(req)
+	if err != nil {
+		a.logger.Error("Error while doing an HTTP request!", zap.Error(err))
+		return domain.ErrFastmailInternal
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		a.logger.Error("Wrong status code!")
+		return domain.ErrFastmailInternal
+	}
+
+	var jsonResp struct {
+		MethodResponses []*Invocation[*MaskedEmailSetResponse] `json:"methodResponses"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&jsonResp); err != nil {
+		a.logger.Error("Error while trying to decode JSON response!", zap.Error(err))
+		return domain.ErrFastmailInternal
+	}
+
+	return nil
+}
+
+func (a *adapter) EnableMaskedEmail(ctx context.Context, tokenSrc oauth2.TokenSource, id string) error {
+	accountId, err := a.openSession(ctx, tokenSrc)
+	if err != nil {
+		return err
+	}
+
+	if err := a.enableMaskedEmail(ctx, tokenSrc, accountId, id); err != nil {
+		return err
+	}
+
+	return nil
 }

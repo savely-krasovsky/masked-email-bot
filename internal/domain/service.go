@@ -17,7 +17,8 @@ import (
 type Service interface {
 	StartCommand(telegramID int64, languageCode string) (string, error)
 	HandleRedirect(ctx context.Context, code, state string) error
-	Link(telegramID int64, forDomain string) (string, error)
+	Link(telegramID int64, forDomain string) (*MaskedEmail, error)
+	EnableMaskedEmail(telegramID int64, id string) error
 }
 
 type service struct {
@@ -122,14 +123,14 @@ func (s *service) HandleRedirect(ctx context.Context, code, state string) error 
 	return nil
 }
 
-func (s *service) Link(telegramID int64, forDomain string) (string, error) {
+func (s *service) Link(telegramID int64, forDomain string) (*MaskedEmail, error) {
 	user, err := s.db.GetUser(telegramID)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if user.FastmailToken == nil {
-		return "", ErrNoToken
+		return nil, ErrNoToken
 	}
 
 	ctx := context.Background()
@@ -138,5 +139,29 @@ func (s *service) Link(telegramID int64, forDomain string) (string, error) {
 		user.TelegramID,
 	)
 
-	return s.email.CreateMaskedEmail(ctx, tokenSrc, forDomain)
+	maskedEmail, err := s.email.CreateMaskedEmail(ctx, tokenSrc, forDomain)
+	if err != nil {
+		return nil, err
+	}
+
+	return maskedEmail, nil
+}
+
+func (s *service) EnableMaskedEmail(telegramID int64, id string) error {
+	user, err := s.db.GetUser(telegramID)
+	if err != nil {
+		return err
+	}
+
+	if user.FastmailToken == nil {
+		return ErrNoToken
+	}
+
+	ctx := context.Background()
+	tokenSrc := s.db.NewTokenSource(
+		s.email.GetOAuth2Config().TokenSource(ctx, user.FastmailToken),
+		user.TelegramID,
+	)
+
+	return s.email.EnableMaskedEmail(ctx, tokenSrc, id)
 }

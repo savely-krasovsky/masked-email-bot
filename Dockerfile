@@ -1,11 +1,11 @@
-FROM docker.io/golang:1.20-alpine3.18 AS build
+FROM docker.io/golang:1.21-alpine3.18 AS build
 
 WORKDIR /usr/local/src/masked-email-bot
 
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
 
-RUN apk add shadow==4.13-r2 gcc==12.2.1_git20220924-r10 musl-dev==1.2.4-r0 && useradd -u 10001 gopher
+RUN apk add shadow==4.13-r4 gcc==12.2.1_git20220924-r10 musl-dev==1.2.4-r2 && useradd -u 10001 gopher
 
 COPY . .
 
