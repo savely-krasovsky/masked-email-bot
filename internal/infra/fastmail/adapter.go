@@ -4,14 +4,16 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/L11R/masked-email-bot/internal/domain"
-	"go.uber.org/zap"
-	"golang.org/x/oauth2"
 	"net/http"
 	"net/netip"
 	"net/url"
 	"regexp"
 	"strings"
+
+	"go.uber.org/zap"
+	"golang.org/x/oauth2"
+
+	"github.com/L11R/masked-email-bot/internal/domain"
 )
 
 type adapter struct {
@@ -203,7 +205,7 @@ func (a *adapter) enableMaskedEmail(ctx context.Context, tokenSrc oauth2.TokenSo
 						},
 					},
 				},
-				ID: "0",
+				ID: id,
 			},
 		},
 	}

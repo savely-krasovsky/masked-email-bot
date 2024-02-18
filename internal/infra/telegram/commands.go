@@ -1,11 +1,13 @@
 package telegram
 
 import (
+	"errors"
+	"regexp"
+	"strings"
+
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"go.uber.org/zap"
-	"regexp"
-	"strings"
 )
 
 func (d *delivery) startCommand(localizer *i18n.Localizer, update tgbotapi.Update) error {
@@ -81,7 +83,13 @@ func (d *delivery) generateMaskedEmail(localizer *i18n.Localizer, update tgbotap
 }
 
 func (d *delivery) enableMaskedEmail(localizer *i18n.Localizer, update tgbotapi.Update) error {
-	if err := d.service.EnableMaskedEmail(update.CallbackQuery.From.ID, update.CallbackData()); err != nil {
+	dataParts := strings.Split(update.CallbackData(), ":")
+	if len(dataParts) < 2 {
+		return errors.New("invalid callback data")
+	}
+	id := dataParts[1]
+
+	if err := d.service.EnableMaskedEmail(update.CallbackQuery.From.ID, id); err != nil {
 		callback := tgbotapi.NewCallback(update.CallbackQuery.ID, localizer.MustLocalize(&i18n.LocalizeConfig{
 			MessageID: "TelegramError",
 		}))
