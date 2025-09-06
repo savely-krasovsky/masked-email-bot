@@ -66,7 +66,10 @@ func (a *adapter) openSession(ctx context.Context, tokenSrc oauth2.TokenSource) 
 
 func (a *adapter) createMaskedEmail(ctx context.Context, tokenSrc oauth2.TokenSource, accountID, forDomain, emailPrefix string) (*MaskedEmail, error) {
 	request := &Request[*MaskedEmailSetRequest]{
-		Using: []string{"https://www.fastmail.com/dev/maskedemail"},
+		Using: []string{
+			"urn:ietf:params:jmap:core",
+			"https://www.fastmail.com/dev/maskedemail",
+		},
 		MethodCalls: []*Invocation[*MaskedEmailSetRequest]{
 			{
 				Name: "MaskedEmail/set",
