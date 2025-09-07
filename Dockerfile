@@ -5,7 +5,7 @@ WORKDIR /usr/local/src/masked-email-bot
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
 
-RUN apk add shadow==4.18.0-r0 gcc==15.2.0-r0 musl-dev==1.2.5-r20 && useradd -u 10001 gopher
+RUN apk add shadow==4.17.3-r0 gcc==14.2.0-r6 musl-dev==1.2.5-r10 && useradd -u 10001 gopher
 
 COPY . .
 
