@@ -1,17 +1,17 @@
-FROM docker.io/golang:1.21-alpine3.18 AS build
+FROM docker.io/golang:1.25-alpine3.22 AS build
 
 WORKDIR /usr/local/src/masked-email-bot
 
 COPY go.mod go.sum ./
 RUN go mod download && go mod verify
 
-RUN apk add shadow==4.13-r4 gcc==12.2.1_git20220924-r10 musl-dev==1.2.4-r2 && useradd -u 10001 gopher
+RUN apk add shadow==4.18.0-r0 gcc==15.2.0-r0 musl-dev==1.2.5-r20 && useradd -u 10001 gopher
 
 COPY . .
 
 RUN go build -v --ldflags '-linkmode external -extldflags=-static' -o /usr/local/bin/masked-email-bot ./cmd/masked-email-bot
 
-FROM docker.io/alpine:3.18
+FROM docker.io/alpine:3.22
 
 COPY --from=build /etc/passwd /etc/passwd
 COPY --from=build /usr/local/bin/masked-email-bot /usr/local/bin/masked-email-bot
