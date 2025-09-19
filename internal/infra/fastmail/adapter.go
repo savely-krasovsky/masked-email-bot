@@ -196,7 +196,10 @@ func (a *adapter) CreateMaskedEmailWithPrefix(ctx context.Context, tokenSrc oaut
 
 func (a *adapter) enableMaskedEmail(ctx context.Context, tokenSrc oauth2.TokenSource, accountID, id string) error {
 	request := &Request[*MaskedEmailSetRequest]{
-		Using: []string{"https://www.fastmail.com/dev/maskedemail"},
+		Using: []string{
+			"urn:ietf:params:jmap:core",
+			"https://www.fastmail.com/dev/maskedemail",
+		},
 		MethodCalls: []*Invocation[*MaskedEmailSetRequest]{
 			{
 				Name: "MaskedEmail/set",
