@@ -1,5 +1,9 @@
 # Masked Email Bot
 
+[![Public Instance](https://img.shields.io/badge/telegram-public%20instance-green?logo=telegram&logoColor=white)](https://t.me/masked_email_bot)
+[![Terms of Service](https://img.shields.io/badge/terms%20of%20service-blue)](https://krasovs.ky/masked-email-bot/terms.html)
+[![Privacy Policy](https://img.shields.io/badge/privacy%20policy-blue)](https://krasovs.ky/masked-email-bot/privacy-policy.html)
+
 Dead simple Telegram bot that allows you to create masked emails from any device with Telegram installed.
 
 1) My hosted instance uses the official OAuth2 integration; this allows my app to be shown as the creator of
@@ -28,7 +32,3 @@ docker rm -v $id
 ```
 
 It requires `podman` or `docker`.
-
-## [Privacy Policy](https://krasovs.ky/masked-email-bot/privacy-policy.html)
-
-## [Terms of Service](https://krasovs.ky/masked-email-bot/terms.html)
