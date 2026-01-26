@@ -21,7 +21,7 @@ Dead simple Telegram bot that allows you to create masked emails from any device
 
 ## Building
 
-To build static binary you can use this script:
+To build a static binary, you can use this script:
 
 ```bash
 #!/bin/sh
