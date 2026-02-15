@@ -18,4 +18,4 @@ COPY --from=build /usr/local/bin/masked-email-bot /usr/local/bin/masked-email-bo
 
 USER gopher
 
-CMD ["masked-email-bot"]
+CMD ["/usr/local/bin/masked-email-bot"]
