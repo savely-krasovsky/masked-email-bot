@@ -9,7 +9,7 @@ RUN go mod download
 
 COPY . .
 
-RUN go build \
+RUN go build -v \
     -ldflags="-s -w -extldflags '-static'" \
     -o /app/bot \
     ./cmd/masked-email-bot
