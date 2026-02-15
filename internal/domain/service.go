@@ -9,11 +9,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"go.uber.org/zap"
-	"golang.org/x/oauth2"
 	"io"
 	"net/url"
 	"regexp"
+
+	"go.uber.org/zap"
+	"golang.org/x/oauth2"
 )
 
 type Service interface {
@@ -144,7 +145,7 @@ func (s *service) GenerateMaskedEmail(telegramID int64, messageText string) (*Ma
 
 	u, err := url.Parse(messageText)
 	if err != nil || regexp.MustCompile(`[a-z0-9_]+`).FindString(u.String()) == messageText {
-		s.logger.Error("Error while parsing url for domain!", zap.Error(err))
+		s.logger.Warn("Cannot parse url for domain!", zap.Error(err))
 		return s.email.CreateMaskedEmailWithPrefix(ctx, tokenSrc, messageText)
 	}
 
