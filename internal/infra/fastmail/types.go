@@ -45,10 +45,16 @@ type Response[T any] struct {
 	SessionState    string           `json:"sessionState"`
 }
 
+type MaskedEmailSetError struct {
+	Type        string `json:"type"`
+	Description string `json:"description"`
+}
+
 type MaskedEmailSetResponse struct {
-	Created   map[string]*MaskedEmail `json:"created"`
-	Updated   map[string]*MaskedEmail `json:"updated"`
-	Destroyed []string                `json:"destroyed"`
+	NotCreated map[string]*MaskedEmailSetError `json:"notCreated"`
+	Created    map[string]*MaskedEmail         `json:"created"`
+	Updated    map[string]*MaskedEmail         `json:"updated"`
+	Destroyed  []string                        `json:"destroyed"`
 }
 
 type Invocation[T any] struct {

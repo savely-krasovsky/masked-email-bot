@@ -8,6 +8,7 @@ var (
 	ErrNoState                        = errors.New("common: no state")
 	ErrRandom                         = errors.New("common: cannot generate random bytes")
 	ErrJSONEncoding                   = errors.New("common: cannot encode json")
+	ErrFastmailPrefixReserved         = errors.New("fastmail: email prefix is reserved")
 	ErrFastmailInternal               = errors.New("fastmail: internal error")
 	ErrFastmailPrimaryAccountNotFound = errors.New("fastmail: primary account not found")
 	ErrTelegramInternal               = errors.New("telegram: internal error")
