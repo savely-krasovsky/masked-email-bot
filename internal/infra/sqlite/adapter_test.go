@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/L11R/masked-email-bot/internal/domain"
+	"github.com/savely-krasovsky/masked-email-bot/internal/domain"
 	"github.com/sethvargo/go-envconfig"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"

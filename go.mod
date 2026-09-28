@@ -1,4 +1,4 @@
-module github.com/L11R/masked-email-bot
+module github.com/savely-krasovsky/masked-email-bot
 
 go 1.26.0
 

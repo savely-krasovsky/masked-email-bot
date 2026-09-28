@@ -3,9 +3,9 @@ package httpserver
 import (
 	"context"
 	"errors"
-	"github.com/L11R/masked-email-bot/internal/domain"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/savely-krasovsky/masked-email-bot/internal/domain"
 	"go.uber.org/zap"
 	"net/http"
 )

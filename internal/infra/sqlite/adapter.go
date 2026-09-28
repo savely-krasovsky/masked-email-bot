@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/L11R/masked-email-bot/internal/domain"
 	"github.com/golang-migrate/migrate/v4"
 	sqlitemigrate "github.com/golang-migrate/migrate/v4/database/sqlite"
+	"github.com/savely-krasovsky/masked-email-bot/internal/domain"
 	"golang.org/x/oauth2"
 	moderncsqlite "modernc.org/sqlite"
 	sqlite3 "modernc.org/sqlite/lib"

@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/L11R/masked-email-bot/internal/domain"
+	"github.com/savely-krasovsky/masked-email-bot/internal/domain"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
