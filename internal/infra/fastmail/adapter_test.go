@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/L11R/masked-email-bot/internal/domain"
+	"github.com/savely-krasovsky/masked-email-bot/internal/domain"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
 )
