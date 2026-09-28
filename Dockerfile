@@ -1,6 +1,6 @@
 FROM docker.io/golang:1.26-alpine3.23 AS build
 
-RUN apk add --no-cache build-base
+ENV CGO_ENABLED=0
 
 WORKDIR /app
 
@@ -10,7 +10,7 @@ RUN go mod download
 COPY . .
 
 RUN go build -v \
-    -ldflags="-s -w -extldflags '-static'" \
+    -ldflags="-s -w" \
     -o /app/bot \
     ./cmd/masked-email-bot
 
