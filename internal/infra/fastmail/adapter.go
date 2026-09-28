@@ -120,8 +120,23 @@ func (a *adapter) createMaskedEmail(ctx context.Context, tokenSrc oauth2.TokenSo
 		return nil, domain.ErrFastmailInternal
 	}
 
-	created, ok := jsonResp.MethodResponses[0].Body.Created["k1"]
-	if !ok {
+	if len(jsonResp.MethodResponses) != 1 || jsonResp.MethodResponses[0] == nil {
+		return nil, domain.ErrFastmailInternal
+	}
+	response := jsonResp.MethodResponses[0]
+	if response.Name != "MaskedEmail/set" || response.ID != "0" || response.Body == nil {
+		return nil, domain.ErrFastmailInternal
+	}
+
+	if setError := response.Body.NotCreated["k1"]; setError != nil {
+		if setError.Type == "invalidProperties" && setError.Description == "Name is reserved" {
+			return nil, domain.ErrFastmailPrefixReserved
+		}
+		return nil, domain.ErrFastmailInternal
+	}
+
+	created, ok := response.Body.Created["k1"]
+	if !ok || created == nil {
 		return nil, domain.ErrFastmailInternal
 	}
 
@@ -149,13 +164,6 @@ func (a *adapter) CreateMaskedEmailFromURL(ctx context.Context, tokenSrc oauth2.
 		emailPrefix = parts[0]
 	default:
 		emailPrefix = parts[len(parts)-2]
-	}
-
-	switch emailPrefix {
-	case "fastmail":
-		emailPrefix = "mail"
-	case "github":
-		emailPrefix = "dev"
 	}
 
 	// remove all special characters except underscore

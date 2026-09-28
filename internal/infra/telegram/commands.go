@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/L11R/masked-email-bot/internal/domain"
+
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"go.uber.org/zap"
@@ -54,9 +56,7 @@ func (d *delivery) anyOtherCommand(localizer *i18n.Localizer, update tgbotapi.Up
 func (d *delivery) generateMaskedEmail(localizer *i18n.Localizer, update tgbotapi.Update) error {
 	maskedEmail, err := d.service.GenerateMaskedEmail(update.Message.From.ID, update.Message.Text)
 	if err != nil {
-		msg := tgbotapi.NewMessage(update.Message.From.ID, localizer.MustLocalize(&i18n.LocalizeConfig{
-			MessageID: "TelegramError",
-		}))
+		msg := tgbotapi.NewMessage(update.Message.From.ID, maskedEmailErrorMessage(localizer, err))
 		if _, err := d.bot.Send(msg); err != nil {
 			d.logger.Error("Error while sending a message!", zap.Error(err))
 		}
@@ -172,9 +172,7 @@ func (d *delivery) answerInlineQueryWithEmail(localizer *i18n.Localizer, update 
 func (d *delivery) generateMaskedEmailWithInlineButton(localizer *i18n.Localizer, update tgbotapi.Update) error {
 	maskedEmail, err := d.service.Prefix(update.CallbackQuery.From.ID, strings.Split(update.CallbackData(), ":")[1])
 	if err != nil {
-		callback := tgbotapi.NewCallback(update.CallbackQuery.ID, localizer.MustLocalize(&i18n.LocalizeConfig{
-			MessageID: "TelegramError",
-		}))
+		callback := tgbotapi.NewCallback(update.CallbackQuery.ID, maskedEmailErrorMessage(localizer, err))
 		callback.ShowAlert = true
 		if _, err := d.bot.Request(callback); err != nil {
 			d.logger.Error("Error while answering to the callback query!", zap.Error(err))
@@ -201,4 +199,12 @@ func (d *delivery) generateMaskedEmailWithInlineButton(localizer *i18n.Localizer
 	}
 
 	return nil
+}
+
+func maskedEmailErrorMessage(localizer *i18n.Localizer, err error) string {
+	messageID := "TelegramError"
+	if errors.Is(err, domain.ErrFastmailPrefixReserved) {
+		messageID = "TelegramFastmailPrefixReserved"
+	}
+	return localizer.MustLocalize(&i18n.LocalizeConfig{MessageID: messageID})
 }
