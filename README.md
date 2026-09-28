@@ -21,14 +21,10 @@ Dead simple Telegram bot that allows you to create masked emails from any device
 
 ## Building
 
-To build a static binary, you can use this script:
+SQLite uses `modernc.org/sqlite`, so building a static binary does not require a C compiler:
 
 ```bash
-#!/bin/sh
-docker build -t masked-email-bot .
-id=$(docker create masked-email-bot)
-docker cp $id:/usr/local/bin/masked-email-bot .
-docker rm -v $id
+CGO_ENABLED=0 go build -o masked-email-bot ./cmd/masked-email-bot
 ```
 
-It requires `podman` or `docker`.
+The Dockerfile also builds with CGO disabled.

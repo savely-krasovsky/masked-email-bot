@@ -7,17 +7,16 @@ import (
 
 	"github.com/L11R/masked-email-bot/internal/domain"
 	"github.com/golang-migrate/migrate/v4"
-	sqlite3migrate "github.com/golang-migrate/migrate/v4/database/sqlite3"
-	"github.com/mattn/go-sqlite3"
+	sqlitemigrate "github.com/golang-migrate/migrate/v4/database/sqlite"
 	"golang.org/x/oauth2"
+	moderncsqlite "modernc.org/sqlite"
+	sqlite3 "modernc.org/sqlite/lib"
 
 	"log"
 
 	// file driver for the golang-migrate
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
-	// sqlite driver
-	_ "github.com/mattn/go-sqlite3"
 	"go.uber.org/zap"
 )
 
@@ -28,13 +27,13 @@ type adapter struct {
 }
 
 func NewAdapter(logger *zap.Logger, config *Config) (domain.Database, error) {
-	db, err := sql.Open("sqlite3", config.DBFile)
+	db, err := sql.Open("sqlite", config.DBFile)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// Migrations block
-	driver, err := sqlite3migrate.WithInstance(db, &sqlite3migrate.Config{})
+	driver, err := sqlitemigrate.WithInstance(db, &sqlitemigrate.Config{})
 	if err != nil {
 		return nil, err
 	}
@@ -62,8 +61,8 @@ func (a *adapter) CreateUser(telegramID int64, languageCode string) error {
 		languageCode,
 	)
 
-	var sqliteErr sqlite3.Error
-	if errors.As(err, &sqliteErr) && sqliteErr.ExtendedCode == 1555 {
+	var sqliteErr *moderncsqlite.Error
+	if errors.As(err, &sqliteErr) && sqliteErr.Code() == sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY {
 		a.logger.Info("User already exists!", zap.Error(err))
 		return domain.ErrSqliteUserAlreadyExists
 	} else if err != nil {
@@ -115,7 +114,7 @@ func (a *adapter) GetUser(telegramID int64) (*domain.User, error) {
 		&tokenStr,
 		&user.LanguageCode,
 	); err != nil {
-		if errors.Is(err, sqlite3.ErrNotFound) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrNoUser
 		}
 
@@ -160,7 +159,7 @@ func (a *adapter) GetOAuth2State(state string) (*domain.OAuth2State, error) {
 		&oauth2State.CodeVerifier,
 		&oauth2State.TelegramID,
 	); err != nil {
-		if errors.Is(err, sqlite3.ErrNotFound) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domain.ErrNoState
 		}
 
